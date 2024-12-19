@@ -37,7 +37,7 @@ class ErrorLogger:
         self.error_links.clear()
         self.retry_count.clear()
 
-    def log_errors(self, log_file="failed_links.log"):
+    def log_errors(self, log_file="data/failed_links.log"):
         """
         Hibás linkek mentése egy log fájlba
         """

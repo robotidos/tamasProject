@@ -6,8 +6,10 @@ import pandas as pd
 import xml.etree.ElementTree as ET
 from bs4 import BeautifulSoup
 from concurrent.futures import ThreadPoolExecutor
-import argparse
 import error_log
+import json
+from common_args import ArgumentParser
+
 
 class SitemapReader:
     """
@@ -162,7 +164,6 @@ class ProductProcessor:
                 except Exception as e:
                     print(f"\nHiba történt a következő link feldolgozásakor: {link} - {e}")
 
-
         error_logger.log_errors()
 
     @staticmethod
@@ -195,19 +196,29 @@ def set_arg_sku():
         print(e)
 
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Termékadatok kinyerése.")
-    parser.add_argument("--sku", type=str, help="Csak az adott SKU-nak megfelelő terméket dolgozza fel.", required=False)
-    parser.add_argument("--format", type=str, choices=["tsv", "xlsx"], default="tsv", help="Mentési formátum: 'tsv' vagy 'xlsx'.")
-    parser.add_argument("--supplier", type=str, required=True, help="A szállító neve (pl. 'Hikoki').")
-    args = parser.parse_args()
+def load_config(config_path):
+    """
+    Konfiguráció betöltése egy JSON fájlból.
+    :param config_path: A konfigurációs fájl elérési útvonala.
+    :return: A konfiguráció adatai (szótár formátumban).
+    """
+    try:
+        with open(config_path, "r", encoding="utf-8") as config_file:
+            return json.load(config_file)
+    except FileNotFoundError:
+        print(f"Hiba: A konfigurációs fájl nem található: {config_path}")
+        sys.exit(1)
+    except json.JSONDecodeError as e:
+        print(f"Hiba a konfigurációs fájl beolvasásakor: {e}")
+        sys.exit(1)
 
-    supplier_settings = {
-        "Hikoki": {
-            "sitemap_url": "https://www.hikoki-powertools.hu/sitemap.xml",
-            "product_url_prefix": "https://www.hikoki-powertools.hu/hu/termekek/"
-        }
-    }
+
+if __name__ == "__main__":
+    arg_parser = ArgumentParser()
+    args = arg_parser.parse()
+
+    config_path = "data/config.json"
+    supplier_settings = load_config(config_path)
 
     if args.supplier not in supplier_settings:
         print(f"Nem támogatott szállító: {args.supplier}")
