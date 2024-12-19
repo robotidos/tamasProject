@@ -44,4 +44,3 @@ class ErrorLogger:
         with open(log_file, "w") as file:
             for link, error in self.error_links.items():
                 file.write(f"{link} - {error}\n")
-        print(f"Hibás linkek mentve a következő fájlba: {log_file}")

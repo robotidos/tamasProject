@@ -57,10 +57,8 @@ class ProductSaver:
         df = pd.DataFrame(data)
         if file_format == "tsv":
             df.to_csv(file_path, sep='\t', index=False, quoting=3, escapechar='\\', doublequote=False)
-            print(f"Adatok sikeresen mentve TSV formátumban: {file_path}")
         elif file_format == "xlsx":
             df.to_excel(file_path, index=False)
-            print(f"Adatok sikeresen mentve XLSX formátumban: {file_path}")
         else:
             raise ValueError("Támogatott formátumok: 'tsv', 'xlsx'")
 
@@ -96,17 +94,15 @@ class ProductScraper:
         return image_url
 
     @staticmethod
-    def scrape_product_data(product_url):
-        response = requests.get(product_url)
-        if response.status_code == 200:
+    def scrape_product_data(link, error_logger=None):
+        try:
+            response = requests.get(link)
+            response.raise_for_status()
             soup = BeautifulSoup(response.content, 'html.parser')
-
-            sku = product_url.split("/")[-1]
+            sku = link.split("/")[-1]
 
             name_tag = soup.find('h2', class_='a-ttl_h2')
             product_name = name_tag.find('span', class_='a-ttl_txt').get_text(strip=True) if name_tag else ""
-
-            orderable = "N" if soup.find('span', class_='a-label a-label_new', string="Nem rendelhető") else "Y"
 
             ean_code = ProductScraper.extract_section(soup, "EAN-kód:", 'p')
             gross_mass = ProductScraper.extract_section(soup, "Bruttó tömeg:", 'p')
@@ -118,21 +114,26 @@ class ProductScraper:
 
             image_url = ProductScraper.get_image(sku, soup)
 
-            return ProductScraper.collect_product_data(
-                sku=sku,
-                product_name=product_name,
-                product_url=product_url,
-                ean_code=ean_code,
-                gross_mass=gross_mass,
-                vtsz=vtsz,
-                features=features,
-                specifications=specifications,
-                included_accessories=included_accessories,
-                image_url=image_url,
-                orderable=orderable
-            )
-        else:
-            raise Exception(f"Hiba történt az oldal letöltésekor: {response.status_code}")
+            if not product_name or not image_url or soup.find('span', class_='a-label a-label_new',
+                                                              string="Nem rendelhető"):
+                return None
+
+            return {
+                "sku": sku,
+                "url": link,
+                "product_name": product_name,
+                "ean_code": ean_code,
+                "gross_mass": gross_mass,
+                "vtsz": vtsz,
+                "features": features,
+                "specifications": specifications,
+                "included_accessories": included_accessories,
+                "image_url": image_url,
+            }
+        except Exception as e:
+            if error_logger:
+                error_logger.add_error(link, str(e))
+            raise
 
 
 class ProductProcessor:
@@ -145,7 +146,8 @@ class ProductProcessor:
         # ThreadPoolExecutor párhuzamos feldolgozásra
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             # Linkek feldolgozása párhuzamosan
-            future_to_url = {executor.submit(ProductProcessor.scrape_with_retry, link, error_logger): link for link in links}
+            future_to_url = {executor.submit(ProductProcessor.scrape_with_retry, link, error_logger, 3):
+                                 link for link in links}
 
             # Eredmények feldolgozása, ahogy elkészülnek
             for i, future in enumerate(future_to_url, 1):
@@ -154,12 +156,13 @@ class ProductProcessor:
                     result = future.result()
                     if result:
                         product_data.append(result)
+                    ProductSaver.save(product_data, output_file, file_format=output_format)
                     sys.stdout.write(f"\rFeldolgozott linkek: {i}/{total_links}")
                     sys.stdout.flush()
                 except Exception as e:
                     print(f"\nHiba történt a következő link feldolgozásakor: {link} - {e}")
 
-        ProductSaver.save(product_data, output_file, file_format=output_format)
+
         error_logger.log_errors()
 
     @staticmethod
@@ -172,6 +175,24 @@ class ProductProcessor:
                 error_logger.increment_retry(link)
                 if not error_logger.can_retry(link, max_retries):
                     raise
+
+
+def set_arg_sku():
+    try:
+        if args.sku:
+            product_links = sitemap_reader.read_sitemap()
+            product_url = next((link for link in product_links if args.sku in link), None)
+            if product_url:
+                print(f"Adatok feldolgozása az SKU alapján: {args.sku}")
+                product_data = [ProductScraper.scrape_product_data(product_url)]
+                ProductSaver.save(product_data, output_file, file_format=args.format)
+            else:
+                print(f"Nem található az SKU a sitemap-ben: {args.sku}")
+        else:
+            product_links = sitemap_reader.read_sitemap()
+            ProductProcessor.process_links_parallel(product_links, output_file, args.format)
+    except Exception as e:
+        print(e)
 
 
 if __name__ == "__main__":
@@ -196,18 +217,4 @@ if __name__ == "__main__":
     sitemap_reader = SitemapReader(settings["sitemap_url"], settings["product_url_prefix"])
     output_file = fr"data/{args.supplier.lower()}_products.{args.format}"
 
-    try:
-        if args.sku:
-            product_links = sitemap_reader.read_sitemap()
-            product_url = next((link for link in product_links if args.sku in link), None)
-            if product_url:
-                print(f"Adatok feldolgozása az SKU alapján: {args.sku}")
-                product_data = [ProductScraper.scrape_product_data(product_url)]
-                ProductSaver.save(product_data, output_file, file_format=args.format)
-            else:
-                print(f"Nem található az SKU a sitemap-ben: {args.sku}")
-        else:
-            product_links = sitemap_reader.read_sitemap()
-            ProductProcessor.process_links_parallel(product_links, output_file, args.format)
-    except Exception as e:
-        print(e)
+    set_arg_sku()
