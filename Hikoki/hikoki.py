@@ -1,16 +1,13 @@
-from concurrent.futures import ThreadPoolExecutor
-
-import requests
-import xml.etree.ElementTree as ET
-import pandas as pd
-from bs4 import BeautifulSoup
+import os
 import sys
-import path
 import re
+import requests
+import pandas as pd
+import xml.etree.ElementTree as ET
+from bs4 import BeautifulSoup
+from concurrent.futures import ThreadPoolExecutor
 import argparse
-
-# --supplier Hikoki --format tsv
-
+import error_log
 
 class SitemapReader:
     """
@@ -54,6 +51,9 @@ class ProductSaver:
         :param file_path: A célfájl elérési útvonala.
         :param file_format: A fájl formátuma ('tsv' vagy 'xlsx').
         """
+        # Ellenőrizd, hogy a mappa létezik-e, ha nem, hozd létre
+        os.makedirs(os.path.dirname(file_path), exist_ok=True)
+
         df = pd.DataFrame(data)
         if file_format == "tsv":
             df.to_csv(file_path, sep='\t', index=False, quoting=3, escapechar='\\', doublequote=False)
@@ -118,9 +118,6 @@ class ProductScraper:
 
             image_url = ProductScraper.get_image(sku, soup)
 
-            # if not product_name or not image_url or orderable == "N":
-            #     return None
-
             return ProductScraper.collect_product_data(
                 sku=sku,
                 product_name=product_name,
@@ -142,12 +139,13 @@ class ProductProcessor:
     @staticmethod
     def process_links_parallel(links, output_file, output_format="tsv", max_workers=5):
         product_data = []
+        error_logger = error_log.ErrorLogger()
         total_links = len(links)
 
         # ThreadPoolExecutor párhuzamos feldolgozásra
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             # Linkek feldolgozása párhuzamosan
-            future_to_url = {executor.submit(ProductScraper.scrape_product_data, link): link for link in links}
+            future_to_url = {executor.submit(ProductProcessor.scrape_with_retry, link, error_logger): link for link in links}
 
             # Eredmények feldolgozása, ahogy elkészülnek
             for i, future in enumerate(future_to_url, 1):
@@ -162,6 +160,18 @@ class ProductProcessor:
                     print(f"\nHiba történt a következő link feldolgozásakor: {link} - {e}")
 
         ProductSaver.save(product_data, output_file, file_format=output_format)
+        error_logger.log_errors()
+
+    @staticmethod
+    def scrape_with_retry(link, error_logger, max_retries=3):
+        for attempt in range(max_retries):
+            try:
+                return ProductScraper.scrape_product_data(link)
+            except Exception as e:
+                error_logger.add_error(link, str(e))
+                error_logger.increment_retry(link)
+                if not error_logger.can_retry(link, max_retries):
+                    raise
 
 
 if __name__ == "__main__":
@@ -176,7 +186,6 @@ if __name__ == "__main__":
             "sitemap_url": "https://www.hikoki-powertools.hu/sitemap.xml",
             "product_url_prefix": "https://www.hikoki-powertools.hu/hu/termekek/"
         }
-        # Nem így lesz, külön fájlban lesznek tárolva
     }
 
     if args.supplier not in supplier_settings:
@@ -185,7 +194,7 @@ if __name__ == "__main__":
 
     settings = supplier_settings[args.supplier]
     sitemap_reader = SitemapReader(settings["sitemap_url"], settings["product_url_prefix"])
-    output_file = fr"{path.base_dir}/web/scrape/{args.supplier.lower()}_products.{args.format}"
+    output_file = fr"data/{args.supplier.lower()}_products.{args.format}"
 
     try:
         if args.sku:
