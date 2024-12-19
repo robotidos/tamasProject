@@ -329,12 +329,9 @@ def tulajdonsag_sablon(driver):
     driver.quit()
 
 
-
-
-
 property_name_path = fr'{path.base_dir}\add_property.csv'
-csv_path = f'{path.base_dir}\docs\kitoltottseg.xlsx'
-output_path = f'{path.base_dir}\docs\kitoltottseghibak.xlsx'
+csv_path = f'{path.base_dir}\web\docs\kitoltottseg.xlsx'
+output_path = f'{path.base_dir}\web\docs\kitoltottseghibak.xlsx'
 property_type = "multi_value"
 tulajdonsagmodosit_csv_path = rf'{path.base_dir}\tulajdonsagmodosit.csv'
 propidpath = f'{path.base_dir}\propid.csv'
