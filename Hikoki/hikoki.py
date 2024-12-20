@@ -178,13 +178,8 @@ class ProductProcessor:
 
 
 if __name__ == "__main__":
-    arg_parser = ArgumentParser()
-    args = arg_parser.parse()
-
+    args = (ArgumentParser()).parse()
     config_loader = ConfigLoader("data/config.json")
     settings = config_loader.get_supplier_settings(args.supplier, args.format)
-
     sitemap_reader = SitemapReader(settings["sitemap_url"], settings["product_url_prefix"])
-    output_file = settings["output_file"]
-
-    ProductProcessor.process_sku_or_all_links(args, sitemap_reader, output_file)
+    ProductProcessor.process_sku_or_all_links(args, sitemap_reader, settings["output_file"])
