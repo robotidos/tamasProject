@@ -1,6 +1,7 @@
 {
     "Hikoki": {
         "sitemap_url": "https://www.hikoki-powertools.hu/sitemap.xml",
-        "product_url_prefix": "https://www.hikoki-powertools.hu/hu/termekek/"
+        "product_url_prefix": "https://www.hikoki-powertools.hu/hu/termekek/",
+        "output_file_template": "data/{supplier}_products.{format}"
     }
 }

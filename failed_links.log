@@ -1,1 +1,0 @@
-https://www.hikoki-powertools.hu/hu/termekek/damilok-tekercsben/781087 - HTTPSConnectionPool(host='www.hikoki-powertools.hu', port=443): Max retries exceeded with url: /hu/termekek/damilok-tekercsben/781087 (Caused by ConnectTimeoutError(<urllib3.connection.HTTPSConnection object at 0x000001C383553A50>, 'Connection to www.hikoki-powertools.hu timed out. (connect timeout=None)'))

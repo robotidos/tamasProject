@@ -1,6 +1,5 @@
 import argparse
 
-
 class ArgumentParser:
     """
     Egy osztály a közös parancssori argumentumok kezelésére.

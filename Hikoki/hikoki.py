@@ -7,38 +7,26 @@ import xml.etree.ElementTree as ET
 from bs4 import BeautifulSoup
 from concurrent.futures import ThreadPoolExecutor
 import error_log
-import json
 from common_args import ArgumentParser
+from config_loader import ConfigLoader
 
 
 class SitemapReader:
-    """
-    Ez már újrahasználható, konfigurálható. Nem ebben a fájlban lesz, hanem majd importálom
-    """
     def __init__(self, sitemap_url, product_url_prefix):
-        """
-        :param sitemap_url: A sitemap.xml elérési útja.
-        :param product_url_prefix: Az URL prefix, amely a termékekre jellemző.
-        """
         self.sitemap_url = sitemap_url
         self.product_url_prefix = product_url_prefix
 
     def read_sitemap(self):
-        """
-        Beolvassa a sitemap.xml fájlt és visszaadja a termék linkeket.
-        """
         response = requests.get(self.sitemap_url)
         if response.status_code == 200:
             xml_content = response.content
             root = ET.fromstring(xml_content)
-
             links = []
             namespace = {'ns': 'http://www.sitemaps.org/schemas/sitemap/0.9'}
             for loc in root.findall('.//ns:loc', namespace):
                 url = loc.text
                 if url.startswith(self.product_url_prefix):
                     links.append(url)
-
             return links
         else:
             raise Exception(f"Hiba történt az XML letöltésekor: {response.status_code}")
@@ -47,15 +35,7 @@ class SitemapReader:
 class ProductSaver:
     @staticmethod
     def save(data, file_path, file_format="tsv"):
-        """
-        Adatok mentése a megadott formátumban.
-        :param data: A mentendő adatokat tartalmazó lista.
-        :param file_path: A célfájl elérési útvonala.
-        :param file_format: A fájl formátuma ('tsv' vagy 'xlsx').
-        """
-        # Ellenőrizd, hogy a mappa létezik-e, ha nem, hozd létre
         os.makedirs(os.path.dirname(file_path), exist_ok=True)
-
         df = pd.DataFrame(data)
         if file_format == "tsv":
             df.to_csv(file_path, sep='\t', index=False, quoting=3, escapechar='\\', doublequote=False)
@@ -84,6 +64,7 @@ class ProductScraper:
     def collect_product_data(**kwargs):
         return {key: value for key, value in kwargs.items() if value}
 
+    @staticmethod
     def get_image(sku, soup):
         image_url = ""
         image_tag = soup.find('img', {'src': True, 'alt': sku})
@@ -140,6 +121,16 @@ class ProductScraper:
 
 class ProductProcessor:
     @staticmethod
+    def scrape_with_retry(link, error_logger, max_retries=3):
+        for attempt in range(max_retries):
+            try:
+                return ProductScraper.scrape_product_data(link)
+            except Exception as e:
+                error_logger.add_error(link, str(e))
+                if attempt == max_retries - 1:
+                    raise
+
+    @staticmethod
     def process_links_parallel(links, output_file, output_format="tsv", max_workers=5):
         product_data = []
         error_logger = error_log.ErrorLogger()
@@ -166,66 +157,34 @@ class ProductProcessor:
 
         error_logger.log_errors()
 
+
     @staticmethod
-    def scrape_with_retry(link, error_logger, max_retries=3):
-        for attempt in range(max_retries):
-            try:
-                return ProductScraper.scrape_product_data(link)
-            except Exception as e:
-                error_logger.add_error(link, str(e))
-                error_logger.increment_retry(link)
-                if not error_logger.can_retry(link, max_retries):
-                    raise
-
-
-def set_arg_sku():
-    try:
-        if args.sku:
-            product_links = sitemap_reader.read_sitemap()
-            product_url = next((link for link in product_links if args.sku in link), None)
-            if product_url:
-                print(f"Adatok feldolgozása az SKU alapján: {args.sku}")
-                product_data = [ProductScraper.scrape_product_data(product_url)]
-                ProductSaver.save(product_data, output_file, file_format=args.format)
+    def process_sku_or_all_links(args, sitemap_reader, output_file):
+        try:
+            if args.sku:
+                product_links = sitemap_reader.read_sitemap()
+                product_url = next((link for link in product_links if args.sku in link), None)
+                if product_url:
+                    print(f"Adatok feldolgozása az SKU alapján: {args.sku}")
+                    product_data = [ProductScraper.scrape_product_data(product_url)]
+                    ProductSaver.save(product_data, output_file, file_format=args.format)
+                else:
+                    print(f"Nem található az SKU a sitemap-ben: {args.sku}")
             else:
-                print(f"Nem található az SKU a sitemap-ben: {args.sku}")
-        else:
-            product_links = sitemap_reader.read_sitemap()
-            ProductProcessor.process_links_parallel(product_links, output_file, args.format)
-    except Exception as e:
-        print(e)
-
-
-def load_config(config_path):
-    """
-    Konfiguráció betöltése egy JSON fájlból.
-    :param config_path: A konfigurációs fájl elérési útvonala.
-    :return: A konfiguráció adatai (szótár formátumban).
-    """
-    try:
-        with open(config_path, "r", encoding="utf-8") as config_file:
-            return json.load(config_file)
-    except FileNotFoundError:
-        print(f"Hiba: A konfigurációs fájl nem található: {config_path}")
-        sys.exit(1)
-    except json.JSONDecodeError as e:
-        print(f"Hiba a konfigurációs fájl beolvasásakor: {e}")
-        sys.exit(1)
+                product_links = sitemap_reader.read_sitemap()
+                ProductProcessor.process_links_parallel(product_links, output_file, args.format)
+        except Exception as e:
+            print(f"Hiba történt a feldolgozás során: {e}")
 
 
 if __name__ == "__main__":
     arg_parser = ArgumentParser()
     args = arg_parser.parse()
 
-    config_path = "data/config.json"
-    supplier_settings = load_config(config_path)
+    config_loader = ConfigLoader("data/config.json")
+    settings = config_loader.get_supplier_settings(args.supplier, args.format)
 
-    if args.supplier not in supplier_settings:
-        print(f"Nem támogatott szállító: {args.supplier}")
-        sys.exit(1)
-
-    settings = supplier_settings[args.supplier]
     sitemap_reader = SitemapReader(settings["sitemap_url"], settings["product_url_prefix"])
-    output_file = fr"data/{args.supplier.lower()}_products.{args.format}"
+    output_file = settings["output_file"]
 
-    set_arg_sku()
+    ProductProcessor.process_sku_or_all_links(args, sitemap_reader, output_file)
