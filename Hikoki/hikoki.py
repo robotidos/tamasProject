@@ -3,14 +3,13 @@ import sys
 import re
 import requests
 import pandas as pd
-import xml.etree.ElementTree as ET
 from bs4 import BeautifulSoup
 from concurrent.futures import ThreadPoolExecutor
 import error_log
 from common_args import ArgumentParser
 from config_loader import ConfigLoader
 from sitemap_reader import SitemapReader
-from category_scraper import CategoryScraper
+from hikoki_category_scraper import CategoryScraper
 
 
 class ProductSaver:
