@@ -9,27 +9,8 @@ from concurrent.futures import ThreadPoolExecutor
 import error_log
 from common_args import ArgumentParser
 from config_loader import ConfigLoader
-
-
-class SitemapReader:
-    def __init__(self, sitemap_url, product_url_prefix):
-        self.sitemap_url = sitemap_url
-        self.product_url_prefix = product_url_prefix
-
-    def read_sitemap(self):
-        response = requests.get(self.sitemap_url)
-        if response.status_code == 200:
-            xml_content = response.content
-            root = ET.fromstring(xml_content)
-            links = []
-            namespace = {'ns': 'http://www.sitemaps.org/schemas/sitemap/0.9'}
-            for loc in root.findall('.//ns:loc', namespace):
-                url = loc.text
-                if url.startswith(self.product_url_prefix):
-                    links.append(url)
-            return links
-        else:
-            raise Exception(f"Hiba történt az XML letöltésekor: {response.status_code}")
+from sitemap_reader import SitemapReader
+from category_scraper import CategoryScraper
 
 
 class ProductSaver:
@@ -48,7 +29,7 @@ class ProductSaver:
 class ProductScraper:
     @staticmethod
     def clean_html_content(html_content):
-        return re.sub(r'[\r\n\t]', ' ', html_content).replace("<br>", " ").strip()
+        return re.sub(r'[\r\n\t]', ' ', html_content).strip()
 
     @staticmethod
     def extract_section(soup, section_title, next_element_tag):
@@ -97,6 +78,10 @@ class ProductScraper:
 
             image_url = ProductScraper.get_image(sku, soup)
 
+            # Category scraping
+            category_url = CategoryScraper.generate_category_url(link)
+            category = CategoryScraper.get_category_title(category_url) if category_url else ""
+
             if not product_name or not image_url or soup.find('span', class_='a-label a-label_new',
                                                               string="Nem rendelhető"):
                 return None
@@ -112,6 +97,7 @@ class ProductScraper:
                 "specifications": specifications,
                 "included_accessories": included_accessories,
                 "image_url": image_url,
+                "category": category,
             }
         except Exception as e:
             if error_logger:
@@ -121,7 +107,7 @@ class ProductScraper:
 
 class ProductProcessor:
     @staticmethod
-    def scrape_with_retry(link, error_logger, max_retries=3):
+    def scrape_with_retry(link, error_logger, max_retries):
         for attempt in range(max_retries):
             try:
                 return ProductScraper.scrape_product_data(link)
@@ -131,7 +117,7 @@ class ProductProcessor:
                     raise
 
     @staticmethod
-    def process_links_parallel(links, output_file, output_format="tsv", max_workers=5):
+    def process_links_parallel(links, output_file, output_format="tsv", max_workers=3):
         product_data = []
         error_logger = error_log.ErrorLogger()
         total_links = len(links)
@@ -139,7 +125,7 @@ class ProductProcessor:
         # ThreadPoolExecutor párhuzamos feldolgozásra
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             # Linkek feldolgozása párhuzamosan
-            future_to_url = {executor.submit(ProductProcessor.scrape_with_retry, link, error_logger, 3):
+            future_to_url = {executor.submit(ProductProcessor.scrape_with_retry, link, error_logger, 5):
                                  link for link in links}
 
             # Eredmények feldolgozása, ahogy elkészülnek
