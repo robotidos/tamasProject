@@ -20,12 +20,18 @@ class CategoryScraper:
 
             h2_tag = soup.find("h2", class_="a-ttl_h3 a-ttl_border a-ttl_main")
             if h2_tag:
-                return h2_tag.get_text(strip=True)
+                h2_text = h2_tag.get_text(strip=True)
+                if h2_text:
+                    return h2_text
 
-            return ""
+            parts = category_url.split("/")
+            if len(parts) > 5:
+                return parts[5]
+
+            return "Unknown Category"
         except Exception as e:
             print(f"Hiba a kategória betöltésekor: {category_url}: {e}")
-            return ""
+            return "Error Loading Category"
 
     @staticmethod
     def process_product_urls(product_urls):
