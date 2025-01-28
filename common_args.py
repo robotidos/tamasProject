@@ -18,7 +18,8 @@ class ArgumentParser:
         """
         self.parser.add_argument("--sku", type=str, help="Csak az adott SKU-nak megfelelő terméket dolgozza fel.", required=False)
         self.parser.add_argument("--format", type=str, choices=["tsv", "xlsx"], default="tsv", help="Mentési formátum: 'tsv' vagy 'xlsx'.")
-        self.parser.add_argument("--supplier", type=str, required=True, help="A szállító neve (pl. 'Hikoki').")
+        self.parser.add_argument("--supplier", type=str, help="A szállító neve (pl. 'Hikoki').")
+        self.parser.add_argument("--name", type=str)
 
     def parse(self):
         """

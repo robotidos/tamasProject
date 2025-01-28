@@ -1,28 +1,14 @@
-import os
-import sys
-import re
-import requests
-import pandas as pd
-from bs4 import BeautifulSoup
-from concurrent.futures import ThreadPoolExecutor
 import error_log
 from common_args import ArgumentParser
 from config_loader import ConfigLoader
 from sitemap_reader import SitemapReader
+import sys
+import re
+import requests
+from bs4 import BeautifulSoup
+from concurrent.futures import ThreadPoolExecutor
 from hikoki_category_scraper import CategoryScraper
-
-
-class ProductSaver:
-    @staticmethod
-    def save(data, file_path, file_format="tsv"):
-        os.makedirs(os.path.dirname(file_path), exist_ok=True)
-        df = pd.DataFrame(data)
-        if file_format == "tsv":
-            df.to_csv(file_path, sep='\t', index=False, quoting=3, escapechar='\\', doublequote=False)
-        elif file_format == "xlsx":
-            df.to_excel(file_path, index=False)
-        else:
-            raise ValueError("Támogatott formátumok: 'tsv', 'xlsx'")
+from file_save import FileSaver
 
 
 class ProductScraper:
@@ -107,6 +93,12 @@ class ProductScraper:
 class ProductProcessor:
     @staticmethod
     def scrape_with_retry(link, error_logger, max_retries):
+        """
+        Egy link feldolgozása újrapróbálkozásokkal.
+        :param link: A feldolgozandó link.
+        :param error_logger: Hibanaplózó objektum.
+        :param max_retries: Maximális újrapróbálkozások száma.
+        """
         for attempt in range(max_retries):
             try:
                 return ProductScraper.scrape_product_data(link)
@@ -117,24 +109,27 @@ class ProductProcessor:
 
     @staticmethod
     def process_links_parallel(links, output_file, output_format="tsv", max_workers=3):
+        """
+        Linkek párhuzamos feldolgozása és az eredmények mentése.
+        :param links: A feldolgozandó linkek listája.
+        :param output_file: Az eredményfájl elérési útvonala.
+        :param output_format: A fájlformátum ('tsv' vagy 'xlsx').
+        :param max_workers: A párhuzamos feldolgozás szálainak száma.
+        """
         product_data = []
         error_logger = error_log.ErrorLogger()
         total_links = len(links)
 
-        # ThreadPoolExecutor párhuzamos feldolgozásra
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            # Linkek feldolgozása párhuzamosan
-            future_to_url = {executor.submit(ProductProcessor.scrape_with_retry, link, error_logger, 5):
-                                 link for link in links}
+            future_to_url = {executor.submit(ProductProcessor.scrape_with_retry, link, error_logger, 5): link for link in links}
 
-            # Eredmények feldolgozása, ahogy elkészülnek
             for i, future in enumerate(future_to_url, 1):
                 link = future_to_url[future]
                 try:
                     result = future.result()
                     if result:
                         product_data.append(result)
-                    ProductSaver.save(product_data, output_file, file_format=output_format)
+                    FileSaver.save(product_data, output_file, file_format=output_format)
                     sys.stdout.write(f"\rFeldolgozott linkek: {i}/{total_links}")
                     sys.stdout.flush()
                 except Exception as e:
@@ -142,9 +137,14 @@ class ProductProcessor:
 
         error_logger.log_errors()
 
-
     @staticmethod
     def process_sku_or_all_links(args, sitemap_reader, output_file):
+        """
+        Az SKU vagy az összes link feldolgozása.
+        :param args: Az argumentumok objektuma.
+        :param sitemap_reader: A sitemap olvasó objektuma.
+        :param output_file: Az eredményfájl elérési útvonala.
+        """
         try:
             if args.sku:
                 product_links = sitemap_reader.read_sitemap()
@@ -152,7 +152,7 @@ class ProductProcessor:
                 if product_url:
                     print(f"Adatok feldolgozása az SKU alapján: {args.sku}")
                     product_data = [ProductScraper.scrape_product_data(product_url)]
-                    ProductSaver.save(product_data, output_file, file_format=args.format)
+                    FileSaver.save(product_data, output_file, file_format=args.format)
                 else:
                     print(f"Nem található az SKU a sitemap-ben: {args.sku}")
             else:
@@ -164,7 +164,7 @@ class ProductProcessor:
 
 if __name__ == "__main__":
     args = (ArgumentParser()).parse()
-    config_loader = ConfigLoader("data/config.json")
+    config_loader = ConfigLoader("../config.json")
     settings = config_loader.get_supplier_settings(args.supplier, args.format)
     sitemap_reader = SitemapReader(settings["sitemap_url"], settings["product_url_prefix"])
     ProductProcessor.process_sku_or_all_links(args, sitemap_reader, settings["output_file"])

@@ -42,3 +42,5 @@ class CategoryScraper:
                 category_title = CategoryScraper.get_category_title(category_url)
                 result.append({"url": url, "category": category_title})
         return result
+
+
