@@ -1,4 +1,13 @@
 {
+    "toya24": {
+        "base_url": "https://toya24.pl",
+        "webshop_url_eng": "https://toya24.pl/main-eng.html",
+        "webshop_url_hun": "https://toya24.pl/main-hun.html",
+        "data_path": "",
+        "output_file_template": "{supplier}_products.{format}",
+        "category_file_template": "data/{supplier}_categories_{l}.{format}",
+        "product_links_template": "data/{supplier}_product_links_{l}.{format}"
+    },
     "Hikoki": {
         "sitemap_url": "https://www.hikoki-powertools.hu/sitemap.xml",
         "product_url_prefix": "https://www.hikoki-powertools.hu/hu/termekek/",
@@ -7,13 +16,6 @@
         "category_file_template": "data/{supplier}_categories.{format}",
         "machine_url": "https://www.hikoki-powertools.hu/hu/gepek",
         "accessory_url": "https://www.hikoki-powertools.hu/hu/tartozekok"
-    },
-    "toya24": {
-        "base_url": "https://toya24.pl",
-        "webshop_url": "https://toya24.pl/main-eng.html",
-        "output_file_template": "data/{supplier}_products.{format}",
-        "category_file_template": "data/{supplier}_categories.{format}",
-        "pruduct_links_template": "data/{supplier}_product_links.{format}"
     },
     "ms2_path": {
         "base_path_levi": "C:\\Users\\balazs.levente\\OneDrive - Zákány Szerszámház Kft\\Shared Documents",

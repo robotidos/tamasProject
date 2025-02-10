@@ -14,6 +14,9 @@ class WebCrawler:
         self.save_threshold = 100
         self.saved_link_count = 0
         self.config = config_loader.get_supplier_settings(args.supplier, args.format)
+        self.webshop_url = self.config.get(f"webshop_url_{args.l}")
+        self.output_file = self.config["product_links_template"].format(supplier=args.supplier, l=args.l,
+                                                                        format=args.format)
 
     def extract_main_links(self, soup, base_url):
         main_links = set()
@@ -39,9 +42,7 @@ class WebCrawler:
             print(f"Hiba történt az oldal bejárása közben: {url} - {e}")
 
     def crawl(self):
-        start_url = self.config["webshop_url"]
-        output_file = self.config["pruduct_links_template"].format(supplier=args.supplier, format=args.format)
-
+        start_url = self.webshop_url  # Az aktuális nyelvű webshop URL
         try:
             response = self.session.get(start_url, timeout=10)
             response.raise_for_status()
@@ -75,7 +76,7 @@ class WebCrawler:
                             data,  # A mentendő adat
                             self.saved_link_count,  # Az eddig mentett adatok száma
                             self.save_threshold,  # A mentési küszöbérték
-                            output_file,  # A fájl elérési útvonala
+                            self.output_file,  # A fájl elérési útvonala
                             file_format=args.format  # A fájl formátuma (tsv vagy xlsx)
                         )
 
@@ -87,7 +88,7 @@ class WebCrawler:
 
 
 if __name__ == "__main__":
-    args = (ArgumentParser()).parse()
+    args = ArgumentParser().parse()
     config_loader = ConfigLoader("../config.json")
     crawler = WebCrawler(config_loader, args)
     crawler.crawl()

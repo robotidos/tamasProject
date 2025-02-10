@@ -1,7 +1,7 @@
+import base_sets
 import os
 import pandas as pd
 from common_args import ArgumentParser
-from config_loader import ConfigLoader
 
 class TSVCombiner:
     def __init__(self, folder_path, output_folder, output_file):
@@ -60,20 +60,9 @@ if __name__ == "__main__":
     args = ArgumentParser().parse()
     name = args.name
 
-    # Konfiguráció betöltése
-    config_path = "../config.json"
-    config_loader = ConfigLoader(config_path)
-
     # Dinamikus elérési útvonal generálása
-    base_path_key = f"base_path_{name}"
-    if base_path_key not in config_loader.config["ms2_path"]:
-        raise KeyError(f"A megadott névhez tartozó base_path nincs definiálva: {name}")
-
-    base_path = config_loader.config["ms2_path"][base_path_key]
-    combinate_path = os.path.join(base_path, config_loader.config["ms2_path"]["ms2_path_combinate"] + f"_{name}")
-
-    # Output mappa és fájlnév beállítása
-    output_folder = os.path.join(base_path, config_loader.config["ms2_path"]["ms2_path_tmp"])
+    combinate_path = os.path.join(base_sets.MS2_PATH_COMBINATE, f"{name}")
+    output_folder = base_sets.MS2_PATH_TMP
     output_file = os.path.join(output_folder, f"{name}.tsv")
 
     # TSVCombiner példányosítása és futtatása
