@@ -20,10 +20,15 @@ class ArgumentParser:
         self.parser.add_argument("--format", type=str, choices=["tsv", "xlsx"], default="tsv", help="Mentési formátum: 'tsv' vagy 'xlsx'.")
         self.parser.add_argument("--supplier", type=str, help="A szállító neve (pl. 'Hikoki').")
         self.parser.add_argument("--name", type=str)
+        self.parser.add_argument("--l", type=str, choices=["hun", "eng"])
+        self.parser.add_argument("--link", type=str)
 
     def parse(self):
         """
         Az argumentumok értelmezése és visszaadása.
         :return: Az argumentumok értékei.
         """
-        return self.parser.parse_args()
+        args = self.parser.parse_args()
+
+        return args
+

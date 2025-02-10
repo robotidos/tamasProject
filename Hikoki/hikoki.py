@@ -9,13 +9,10 @@ from bs4 import BeautifulSoup
 from concurrent.futures import ThreadPoolExecutor
 from hikoki_category_scraper import CategoryScraper
 from file_save import FileSaver
+from scraper_helper import ScraperHelper
 
 
 class ProductScraper:
-    @staticmethod
-    def clean_html_content(html_content):
-        return re.sub(r'[\r\n\t]', ' ', html_content).strip()
-
     @staticmethod
     def extract_section(soup, section_title, next_element_tag):
         section = soup.find('h3', class_='a-ttl_h3 a-ttl_border a-ttl_main',
@@ -23,7 +20,7 @@ class ProductScraper:
         if section:
             next_element = section.find_next(next_element_tag)
             if next_element:
-                return ProductScraper.clean_html_content(next_element.decode_contents())
+                return ScraperHelper.clean_html_content(next_element.decode_contents())
         return ""
 
     @staticmethod

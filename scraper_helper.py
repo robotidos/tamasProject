@@ -2,6 +2,9 @@ from urllib3 import Retry
 from requests.adapters import HTTPAdapter
 import requests
 from urllib.parse import urlparse, parse_qs
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+import re
 
 class ScraperHelper:
     @staticmethod
@@ -19,13 +22,6 @@ class ScraperHelper:
 
     @staticmethod
     def find_max_page(soup, link_class, query_param):
-        """
-        Meghatározza a maximális oldalszámot egy oldalon belül.
-        :param soup: A BeautifulSoup objektum, amely tartalmazza a weboldal HTML-jét.
-        :param link_class: Az a linkosztály, amely tartalmazza az oldalszámokat.
-        :param query_param: Az URL lekérdezési paramétere, amely az oldalszámot tárolja.
-        :return: A maximális oldalszám.
-        """
         max_page = 1
         a_tags = soup.find_all('a', href=True, class_=link_class)
 
@@ -39,3 +35,31 @@ class ScraperHelper:
                 continue
 
         return max_page
+
+    @staticmethod
+    def get_table_data(row, index, multiple=False):
+        td_tags = row.find_all("td")
+        if len(td_tags) > index:
+            text = td_tags[index].text.strip()
+            return text.split(",") if multiple else text
+        return ["N/A"] if multiple else "N/A"
+
+    @staticmethod
+    def click_button(driver, by_method, identifier, wait_time=10):
+        """
+        Általános metódus egy kattintható elem megtalálására és kattintására.
+        :param driver: Selenium WebDriver objektum.
+        :param by_method: A keresési metódus (By.CLASS_NAME, By.CSS_SELECTOR stb.).
+        :param identifier: Az elem azonosítója.
+        :param wait_time: Várakozási idő másodpercben (alapértelmezett: 10).
+        """
+        try:
+            wait = WebDriverWait(driver, wait_time)
+            button = wait.until(EC.element_to_be_clickable((by_method, identifier)))
+            button.click()
+        except Exception as e:
+            print(f"Hiba történt a gombra kattintás során: {e}")
+
+    @staticmethod
+    def clean_html_content(html_content):
+        return re.sub(r'[\r\n\t]', ' ', html_content).strip()

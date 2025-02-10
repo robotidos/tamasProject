@@ -1,0 +1,9 @@
+{
+    "toya24": {
+        "base_url": "https://toya24.pl",
+        "webshop_url": "https://toya24.pl/main-eng.htmll",
+        "output_file_template": "data/{supplier}_products.{format}",
+        "category_file_template": "data/{supplier}_categories.{format}",
+        "pruduct_links_template": "data/{supplier}_product_links.{format}"
+    },
+}
